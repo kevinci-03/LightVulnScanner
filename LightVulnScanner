@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime
 import tzlocal
 import subprocess
+import re
 
 COMMON_PORTS = {
     21: "FTP",
@@ -19,6 +20,15 @@ COMMON_PORTS = {
     3306: "MySQL",
     3389: "RDP"
 }
+
+DEFAULT_CREDS = [
+    ("admin", "admin"),
+    ("root", "toor"),
+    ("user", "password"),
+    ("guest", "guest"),
+    ("test", "test"),
+    ("admin", "password")
+]
 
 def main():
     parser = argparse.ArgumentParser(description="Light Vulnerability Scanner")
@@ -65,6 +75,7 @@ def scan_port(target, port):
                     banner = sock.recv(1024).decode('utf-8', errors='ignore').strip()
                     if banner:
                         print(f"[#] Banner for port {port}: {banner}")
+                        check_known_vulns(banner)
                     else:
                         print(f"[#] No banner received for port {port}")
                 except Exception:
@@ -73,6 +84,41 @@ def scan_port(target, port):
                 print(f"[-] Port {port} is closed")
     except socket.error as e:
         print(f"[!] Error scanning port {port}: {e}")
+
+def check_known_vulns(banner):
+    print(f"[*] Checking for known vulnerabilities in banner: {banner}")
+    query = extract_product_version(banner)
+    if not query:
+        print("[*] Could not extract product/version info for vulnerability check.")
+        return
+
+    print(f"[*] Querying searchsploit for: {query}")
+    try:
+        result= subprocess.run(
+            ["searchsploit", banner],
+            capture_output=True,
+            text=True
+        )
+        output = result.stdout.strip()
+        if output:
+            print(f"[!] Found known vulnerabilities:\n{output}")
+        else:
+            print("[*] No known vulnerabilities found.")
+    except FileNotFoundError:
+        print("[!] searchsploit not found. Please install it to use this feature.")
+
+
+def extract_product_version(banner):
+    match = re.search(r"Server:\s*([^\s/]+)(?:/([\d\.]+))?", banner, re.IGNORECASE)
+    if match:
+        product = match.group(1).lower()
+        version = match.group(2) or ""
+        if version:
+            parts = version.split(".")
+            if len(parts) > 1:
+                version = ".".join(parts[:2])
+        return f"{product} {version}".strip()
+    return None
 
 if __name__ == "__main__":
     main()
