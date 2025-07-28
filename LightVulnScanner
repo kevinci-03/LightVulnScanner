@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+
+import socket
+import argparse
+from datetime import datetime
+import tzlocal
+# LightVulnScanner.py
+
+COMMON_PORTS = {
+    21: "FTP",
+    22: "SSH",
+    23: "Telnet",
+    25: "SMTP",
+    53: "DNS",
+    80: "HTTP",
+    110: "POP3",
+    143: "IMAP",
+    443: "HTTPS",
+    3306: "MySQL",
+    3389: "RDP"
+}
+
+def main():
+    parser = argparse.ArgumentParser(description="Light Vulnerability Scanner")
+    parser.add_argument("target", help="Target IP address or hostname")
+    parser.add_argument("--ports", help="Comma-separated list of ports to scan (default: common ports)", default="")
+    args = parser.parse_args()
+    target = args.target
+    ports = [int(p) for p in args.ports.split(",")] if args.ports else list(COMMON_PORTS.keys())
+
+    scan_target(target, ports)
+
+def scan_target(target, ports):
+    local_tz = tzlocal.get_localzone()
+    now = datetime.now(local_tz)
+    print(f"\n[*] Scanning {target}")
+    print(f"[*] Scan started at {now.strftime('%H:%M:%S %Z')}\n")
+    for port in ports:
+        scan_port(target, port)
+
+def scan_port(target, port):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(1)
+            result = sock.connect_ex((target, port))
+            if result == 0:
+                service = COMMON_PORTS.get(port, "Unknown Service")
+                print(f"[+] Port {port} ({service}) is open")
+            else:
+                print(f"[-] Port {port} is closed")
+    except socket.error as e:
+        print(f"[!] Error scanning port {port}: {e}")
+
+if __name__ == "__main__":
+    main()
