@@ -4,7 +4,7 @@ import socket
 import argparse
 from datetime import datetime
 import tzlocal
-# LightVulnScanner.py
+import subprocess
 
 COMMON_PORTS = {
     21: "FTP",
@@ -30,6 +30,13 @@ def main():
 
     scan_target(target, ports)
 
+'''
+This function scans the target for open ports.
+It takes a target IP address or hostname and a list
+of ports to scan. It prints the start time of the scan and iterates through each port
+to check if it is open. If a port is open, it attempts to grab a banner
+from the service running on that port.
+'''
 def scan_target(target, ports):
     local_tz = tzlocal.get_localzone()
     now = datetime.now(local_tz)
@@ -38,6 +45,12 @@ def scan_target(target, ports):
     for port in ports:
         scan_port(target, port)
 
+'''
+This function scans a specific port on the target.
+It attempts to connect to the port and checks if it is open.
+If the port is open, it tries to grab a banner from the service running on that port.
+If a banner is successfully retrieved, it is printed; otherwise, an error message is shown.
+'''
 def scan_port(target, port):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -46,6 +59,16 @@ def scan_port(target, port):
             if result == 0:
                 service = COMMON_PORTS.get(port, "Unknown Service")
                 print(f"[+] Port {port} ({service}) is open")
+                try:
+                    sock.settimeout(2)
+                    sock.sendall(b"HEAD / HTTP/1.0\r\n\r\n")
+                    banner = sock.recv(1024).decode('utf-8', errors='ignore').strip()
+                    if banner:
+                        print(f"[#] Banner for port {port}: {banner}")
+                    else:
+                        print(f"[#] No banner received for port {port}")
+                except Exception:
+                    print(f"[#] Failed to grab banner for port {port}")
             else:
                 print(f"[-] Port {port} is closed")
     except socket.error as e:
